@@ -9,7 +9,6 @@ buildscript {
 }
 
 apply plugin: 'com.android.application'
-apply plugin: 'me.tatarka.retrolambda'
 
 // Manifest version information
 def versionMajor = 0
@@ -17,12 +16,12 @@ def versionMinor = 1
 def versionPatch = 0
 
 android {
-    compileSdkVersion 24
-    buildToolsVersion "24.0.3"
+    compileSdkVersion 29
+    buildToolsVersion "29.0.3"
     defaultConfig {
         applicationId "com.robotpajamas.android.stetho.couchbase"
         minSdkVersion 21
-        targetSdkVersion 24
+        targetSdkVersion 29
         versionCode versionMajor * 10000 + versionMinor * 100 + versionPatch
         versionName "${versionMajor}.${versionMinor}.${versionPatch}"
     }
@@ -53,6 +52,7 @@ android {
 }
 
 repositories {
+    google()
     jcenter()
     mavenCentral()
     flatDir {
@@ -61,15 +61,15 @@ repositories {
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:24.2.1'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.android.support:appcompat-v7:24.2.1'
 
     // Logging
-    compile 'com.jakewharton.timber:timber:4.3.1'
+    implementation 'com.jakewharton.timber:timber:4.7.1'
     // Debugging related
-    compile 'com.facebook.stetho:stetho:1.4.1'
+    implementation 'com.facebook.stetho:stetho:1.5.1'
     // Databases
-    compile 'com.couchbase.lite:couchbase-lite-android:1.2.0'
+    implementation 'com.couchbase.lite:couchbase-lite-android:2.7.1'
 
-    compile project(path: ':stetho-couchbase')
+    implementation project(path: ':stetho-couchbase')
 }

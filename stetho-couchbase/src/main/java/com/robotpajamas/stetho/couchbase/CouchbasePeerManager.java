@@ -2,13 +2,13 @@ package com.robotpajamas.stetho.couchbase;
 
 import android.content.Context;
 
-import com.couchbase.lite.DatabaseOptions;
-import com.couchbase.lite.Document;
-import com.couchbase.lite.Manager;
-import com.couchbase.lite.ManagerOptions;
-import com.couchbase.lite.QueryEnumerator;
-import com.couchbase.lite.QueryRow;
-import com.couchbase.lite.android.AndroidContext;
+import com.couchbase.lite.CouchbaseLiteException;
+import com.couchbase.lite.DataSource;
+import com.couchbase.lite.Meta;
+import com.couchbase.lite.QueryBuilder;
+import com.couchbase.lite.Result;
+import com.couchbase.lite.ResultSet;
+import com.couchbase.lite.SelectResult;
 import com.facebook.stetho.inspector.console.CLog;
 import com.facebook.stetho.inspector.helper.ChromePeerManager;
 import com.facebook.stetho.inspector.helper.PeerRegistrationListener;
@@ -18,12 +18,14 @@ import com.facebook.stetho.inspector.protocol.module.Console;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,20 +45,10 @@ class CouchbasePeerManager extends ChromePeerManager {
     private final Context mContext;
     private final boolean mShowMetadata;
 
-    private Manager mManager;
-
     CouchbasePeerManager(Context context, String packageName, boolean showMetadata) {
         mContext = context;
         mPackageName = packageName;
         mShowMetadata = showMetadata;
-
-        ManagerOptions managerOptions = new ManagerOptions();
-        managerOptions.setReadOnly(true);
-        try {
-            mManager = new Manager(new AndroidContext(mContext), managerOptions);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         setListener(new PeerRegistrationListener() {
             @Override
@@ -72,7 +64,7 @@ class CouchbasePeerManager extends ChromePeerManager {
     }
 
     private void setupPeer(JsonRpcPeer peer) {
-        List<String> potentialDatabases = mManager.getAllDatabaseNames();
+        List<String> potentialDatabases = getAllDatabaseNames();
         for (String database : potentialDatabases) {
             Timber.d("Datebase Name: %s", database);
             Database.DatabaseObject databaseParams = new Database.DatabaseObject();
@@ -87,29 +79,36 @@ class CouchbasePeerManager extends ChromePeerManager {
         }
     }
 
-    List<String> getAllDocumentIds(String databaseId) {
-        Timber.d("getAllDocumentIds: %s", databaseId);
-        ManagerOptions managerOptions = new ManagerOptions();
-        managerOptions.setReadOnly(true);
+    private List<String> getAllDatabaseNames() {
+        final File[] files = mContext.getFilesDir().listFiles();
+        if (files != null) {
+            List<String> databaseNames = new ArrayList<>(files.length);
+            for (File file : files) {
+                if (file.getName().endsWith(".cblite2")) {
+                    final String dbName = file.getName().replace(".cblite2", "");
+                    databaseNames.add(dbName);
+                }
+            }
+            return databaseNames;
+        }
+        return Collections.emptyList();
+    }
 
-        DatabaseOptions databaseOptions = new DatabaseOptions();
-        databaseOptions.setReadOnly(true);
+    List<String> getAllDocumentIds(String databaseId) throws CouchbaseLiteException {
+        Timber.d("getAllDocumentIds: %s", databaseId);
 
         com.couchbase.lite.Database database = null;
         try {
-            // TODO: Create LiveQuery on this?
-            // TODO: Open manager/database and cache result - could be expensive operation
-            Manager manager = new Manager(new AndroidContext(mContext), managerOptions);
-            database = manager.openDatabase(databaseId, databaseOptions);
-
-            List<String> docIds = new ArrayList<>();
-            QueryEnumerator result = database.createAllDocumentsQuery().run();
-            while (result.hasNext()) {
-                QueryRow row = result.next();
-                docIds.add(row.getDocumentId());
+            database = new com.couchbase.lite.Database(databaseId);
+            final ResultSet results = QueryBuilder.select(SelectResult.expression(Meta.id))
+                .from(DataSource.database(database))
+                .execute();
+            Set<String> docIds = new HashSet<>();
+            for (Result result : results) {
+                final String id = result.getString("id");
+                docIds.add(id);
             }
-
-            return docIds;
+            return new ArrayList<>(docIds);
         } catch (Exception e) {
             return Collections.emptyList();
         } finally {
@@ -153,28 +152,24 @@ class CouchbasePeerManager extends ChromePeerManager {
 
     private Map<String, String> getDocument(String databaseId, String docId) {
         Timber.d("getDocument: %s, %s", databaseId, docId);
-        DatabaseOptions databaseOptions = new DatabaseOptions();
-        databaseOptions.setReadOnly(true);
         com.couchbase.lite.Database database = null;
-
         try {
-            database = mManager.openDatabase(databaseId, databaseOptions);
-            Document doc = database.getExistingDocument(docId);
-            if (doc == null) {
-                return new TreeMap<>();
-            }
-
+            database = new com.couchbase.lite.Database(databaseId);
+            final Map<String, Object> doc = database.getDocument(docId).toMap();
             Map<String, String> returnedMap = new TreeMap<>();
-            for (Map.Entry<String, Object> entry : doc.getProperties().entrySet()) {
+            for (Map.Entry<String, Object> entry : doc.entrySet()) {
                 returnedMap.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
             return returnedMap;
         } catch (Exception e) {
-            Timber.e(e.toString());
-            return new TreeMap<>();
+            return Collections.emptyMap();
         } finally {
             if (database != null) {
-                database.close();
+                try {
+                    database.close();
+                } catch (CouchbaseLiteException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.robotpajamas.stetho.couchbase;
 
+import com.couchbase.lite.CouchbaseLiteException;
 import com.facebook.stetho.inspector.jsonrpc.JsonRpcPeer;
 import com.facebook.stetho.inspector.jsonrpc.JsonRpcResult;
 import com.facebook.stetho.inspector.protocol.ChromeDevtoolsDomain;
@@ -9,6 +10,7 @@ import com.facebook.stetho.json.annotation.JsonProperty;
 
 import org.json.JSONObject;
 
+import java.util.Collections;
 import java.util.List;
 
 import timber.log.Timber;
@@ -42,7 +44,12 @@ class Database implements ChromeDevtoolsDomain {
         Timber.d("getAllDocumentIds: %s", String.valueOf(params));
         GetDatabaseTableNamesRequest request = mObjectMapper.convertValue(params, GetDatabaseTableNamesRequest.class);
         GetDatabaseTableNamesResponse response = new GetDatabaseTableNamesResponse();
-        response.tableNames = mCouchbasePeerManager.getAllDocumentIds(request.databaseId);
+        try {
+            response.tableNames = mCouchbasePeerManager.getAllDocumentIds(request.databaseId);
+        } catch (CouchbaseLiteException e) {
+            response.tableNames = Collections.emptyList();
+            e.printStackTrace();
+        }
         return response;
     }
 
