@@ -19,6 +19,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,6 +39,7 @@ class CouchbasePeerManager extends ChromePeerManager {
 
     private static final String DOC_PATTERN = "\"(.*?)\"";
     private static final List<String> COLUMN_NAMES = Arrays.asList("key", "value");
+    private static final String CBLITE_EXTENSION = ".cblite2";
 
     private final Pattern mPattern = Pattern.compile(DOC_PATTERN);
 
@@ -84,8 +86,9 @@ class CouchbasePeerManager extends ChromePeerManager {
         if (files != null) {
             List<String> databaseNames = new ArrayList<>(files.length);
             for (File file : files) {
-                if (file.getName().endsWith(".cblite2")) {
-                    final String dbName = file.getName().replace(".cblite2", "");
+                final String fileName = file.getName();
+                if (fileName.endsWith(CBLITE_EXTENSION)) {
+                    final String dbName = fileName.replace(CBLITE_EXTENSION, "");
                     databaseNames.add(dbName);
                 }
             }
@@ -118,7 +121,7 @@ class CouchbasePeerManager extends ChromePeerManager {
         }
     }
 
-    Database.ExecuteSQLResponse executeSQL(String databaseId, String query) throws JSONException {
+    Database.ExecuteSQLResponse executeSQL(String databaseId, String query) throws JSONException, IOException {
         Timber.d("executeSQL: %s, %s", databaseId, query);
 
         Database.ExecuteSQLResponse response = new Database.ExecuteSQLResponse();
@@ -131,7 +134,12 @@ class CouchbasePeerManager extends ChromePeerManager {
         String docId = matcher.group(1);
         Timber.d("Parsed doc ID: %s", docId);
 
-        Map<String, String> map = getDocument(databaseId, docId);
+        Map<String, String> map = null;
+        try {
+            map = getDocument(databaseId, docId);
+        } catch (CouchbaseLiteException e) {
+            throw new IOException(e);
+        }
         response.columnNames = COLUMN_NAMES;
         response.values = new ArrayList<>();
         for (Map.Entry<String, String> entry : map.entrySet()) {
@@ -150,7 +158,7 @@ class CouchbasePeerManager extends ChromePeerManager {
     }
 
 
-    private Map<String, String> getDocument(String databaseId, String docId) {
+    private Map<String, String> getDocument(String databaseId, String docId) throws CouchbaseLiteException {
         Timber.d("getDocument: %s, %s", databaseId, docId);
         com.couchbase.lite.Database database = null;
         try {
@@ -165,11 +173,7 @@ class CouchbasePeerManager extends ChromePeerManager {
             return Collections.emptyMap();
         } finally {
             if (database != null) {
-                try {
-                    database.close();
-                } catch (CouchbaseLiteException e) {
-                    e.printStackTrace();
-                }
+                database.close();
             }
         }
     }
