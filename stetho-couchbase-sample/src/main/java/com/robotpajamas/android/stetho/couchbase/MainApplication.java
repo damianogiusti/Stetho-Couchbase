@@ -40,6 +40,7 @@ public class MainApplication extends Application {
     // Initialize database and create some fake data
     private void initializeCouchbase(Context context) {
         final Map<String, Object> s = new HashMap<>();
+        s.put("type", "User");
         s.put("key1", "value1");
         s.put("key2", "value2");
         s.put("key3", "value3");
@@ -60,7 +61,9 @@ public class MainApplication extends Application {
             mDatabase.save(doc);
             doc = new MutableDocument("id:123456");
             for (Map.Entry<String, Object> entry : s.entrySet()) {
-                doc.setValue(entry.getKey(), entry.getValue());
+                if (!"type".equals(entry.getKey())) {
+                    doc.setValue(entry.getKey(), entry.getValue());
+                }
             }
             mDatabase.save(doc);
             doc = new MutableDocument("id:123abc");

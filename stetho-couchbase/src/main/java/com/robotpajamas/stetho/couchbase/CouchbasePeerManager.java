@@ -5,6 +5,7 @@ import android.content.Context;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.DataSource;
 import com.couchbase.lite.Meta;
+import com.couchbase.lite.Ordering;
 import com.couchbase.lite.QueryBuilder;
 import com.couchbase.lite.Result;
 import com.couchbase.lite.ResultSet;
@@ -38,10 +39,12 @@ import timber.log.Timber;
 class CouchbasePeerManager extends ChromePeerManager {
 
     private static final String DOC_PATTERN = "\"(.*?)\"";
+    private static final String DOC_ID_PATTERN = "^(<.+>::).+";
     private static final List<String> COLUMN_NAMES = Arrays.asList("key", "value");
     private static final String CBLITE_EXTENSION = ".cblite2";
 
     private final Pattern mPattern = Pattern.compile(DOC_PATTERN);
+    private final Pattern mDocIdPattern = Pattern.compile(DOC_ID_PATTERN);
 
     private final String mPackageName;
     private final Context mContext;
@@ -103,13 +106,19 @@ class CouchbasePeerManager extends ChromePeerManager {
         com.couchbase.lite.Database database = null;
         try {
             database = new com.couchbase.lite.Database(databaseId);
-            final ResultSet results = QueryBuilder.select(SelectResult.expression(Meta.id))
+            final ResultSet results = QueryBuilder.select(SelectResult.expression(Meta.id), SelectResult.property("type"))
                 .from(DataSource.database(database))
+                .orderBy(Ordering.expression(Meta.expiration).ascending())
                 .execute();
             Set<String> docIds = new HashSet<>();
             for (Result result : results) {
                 final String id = result.getString("id");
-                docIds.add(id);
+                final String type = result.getString("type");
+                if (type == null) {
+                    docIds.add(id);
+                } else {
+                    docIds.add(String.format("<%s>::%s", type, id));
+                }
             }
             return new ArrayList<>(docIds);
         } catch (Exception e) {
@@ -163,6 +172,10 @@ class CouchbasePeerManager extends ChromePeerManager {
         com.couchbase.lite.Database database = null;
         try {
             database = new com.couchbase.lite.Database(databaseId);
+            final Matcher matcher = mDocIdPattern.matcher(docId);
+            if (matcher.matches()) {
+                docId = docId.replaceFirst(matcher.group(1), "");
+            }
             final Map<String, Object> doc = database.getDocument(docId).toMap();
             Map<String, String> returnedMap = new TreeMap<>();
             for (Map.Entry<String, Object> entry : doc.entrySet()) {
