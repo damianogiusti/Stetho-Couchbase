@@ -1,8 +1,8 @@
 apply plugin: 'com.android.library'
 
 // Manifest version information
-def versionMajor = 0
-def versionMinor = 2
+def versionMajor = 2
+def versionMinor = 0
 def versionPatch = 0
 
 ext {
