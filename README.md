@@ -1,6 +1,6 @@
 # Stetho-Couchbase
 
-Stetho-Couchbase is a plugin for Stetho to enable visualizing and debugging Android Couchbase databases in Chrome
+Stetho-Couchbase is a plugin for Stetho to enable visualizing and debugging Android Couchbase databases in Chrome. More details can be found here: http://www.sureshjoshi.com/mobile/visualizing-couchbase-chrome-stetho/
 
 ## Usage
 
@@ -14,22 +14,22 @@ public class MyApplication extends Application {
             Stetho.initialize(
                     Stetho.newInitializerBuilder(this)
                             .enableDumpapp(Stetho.defaultDumperPluginsProvider(this))
-                            .enableWebKitInspector(new CouchbaseInspectorModulesProvider(this))
+                            .enableWebKitInspector(new CouchbaseInspectorModulesProvider.Builder(this)
+                                    .showMetadata(true) // Default: true
+                                    .build())
                             .build());
         }
     }
 }
+```
 
 You can either wrap Stetho in a BuildConfig.DEBUG statement, or use a more involved method as described [here](http://littlerobots.nl/blog/stetho-for-android-debug-builds-only/).
-
-
-```
 
 ## Download
 
 ```groovy
 compile 'com.facebook.stetho:stetho:1.4.1'
-compile 'com.robotpajamas.stetho:stetho-couchbase:0.1.0'
+compile 'com.robotpajamas.stetho:stetho-couchbase:0.2.0'
 ```
 
 ## License
